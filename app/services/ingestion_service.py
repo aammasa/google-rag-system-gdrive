@@ -5,7 +5,7 @@ Ingestion service — orchestrates the full Drive → Chunk → Embed → Store 
 import asyncio
 import io
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.config import get_settings
 from app.embeddings.vertex_embeddings import VertexEmbeddings
