@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+    image: google-rag-agent:local
+    container_name: rag-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+    volumes:
+      # Live-reload source during development (override CMD below)
+      - ./app:/app/app
+      - ./credentials:/app/credentials:ro
+      - chroma-data:/app/data/chroma
+    depends_on:
+      chroma:
+        condition: service_healthy
+    networks:
+      - rag-net
+    restart: unless-stopped
+    # Development override: hot-reload with watchfiles
+    command: >
+      uvicorn app.main:app
+        --host 0.0.0.0
+        --port 8080
+        --reload
+        --reload-dir /app/app
+
+  chroma:
+    image: chromadb/chroma:0.5.23
+    container_name: rag-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - rag-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  chroma-data:
+
+networks:
+  rag-net:
+    driver: bridge
