@@ -1,6 +1,9 @@
 """Google Drive API client — authentication and file listing/download."""
 
+import base64
 import io
+import json
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +61,6 @@ class DriveClient:
     def _build_service(self) -> Any:
         creds: Credentials | None = None
         token_path = Path(settings.gdrive_token_file)
-        creds_path = Path(settings.gdrive_credentials_file)
         scopes = settings.gdrive_scopes_list
 
         if token_path.exists():
@@ -69,21 +71,45 @@ class DriveClient:
                 logger.info("drive_token_refresh")
                 creds.refresh(Request())
             else:
-                if not creds_path.exists():
-                    raise FileNotFoundError(
-                        f"OAuth credentials not found at {creds_path}. "
-                        "Download them from GCP Console > APIs & Services > Credentials."
-                    )
+                creds_path = self._resolve_credentials_file()
                 logger.info("drive_oauth_flow_starting")
                 flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), scopes)
                 creds = flow.run_local_server(port=0)
 
-            # Persist refreshed / new token
             token_path.parent.mkdir(parents=True, exist_ok=True)
             token_path.write_text(creds.to_json())
             logger.info("drive_token_saved", path=str(token_path))
 
         return build("drive", "v3", credentials=creds)
+
+    def _resolve_credentials_file(self) -> Path:
+        """
+        Return a path to a valid credentials JSON file.
+
+        Priority:
+          1. GDRIVE_CREDENTIALS_JSON env var (base64-encoded) — written to a temp file
+          2. GDRIVE_CREDENTIALS_FILE path on disk
+        """
+        if settings.gdrive_credentials_json:
+            logger.info("drive_credentials_from_env")
+            raw = base64.b64decode(settings.gdrive_credentials_json)
+            # Validate it's proper JSON before writing
+            json.loads(raw)
+            tmp = tempfile.NamedTemporaryFile(
+                suffix=".json", delete=False, mode="wb"
+            )
+            tmp.write(raw)
+            tmp.flush()
+            return Path(tmp.name)
+
+        creds_path = Path(settings.gdrive_credentials_file)
+        if not creds_path.exists():
+            raise FileNotFoundError(
+                f"OAuth credentials not found at {creds_path}. "
+                "Set GDRIVE_CREDENTIALS_JSON env var or place the file at the path above."
+            )
+        logger.info("drive_credentials_from_file", path=str(creds_path))
+        return creds_path
 
     @property
     def service(self) -> Any:
