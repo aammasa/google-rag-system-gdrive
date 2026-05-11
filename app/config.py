@@ -37,8 +37,9 @@ class Settings(BaseSettings):
 
     # ── Google Drive ─────────────────────────────────────────────────────────
     gdrive_credentials_file: str = Field(default="credentials/gdrive_oauth_credentials.json")
-    gdrive_credentials_json: str = Field(default="")  # base64-encoded credentials.json content
+    gdrive_credentials_json: str = Field(default="")  # base64-encoded credentials.json
     gdrive_token_file: str = Field(default="credentials/gdrive_token.json")
+    gdrive_token_json: str = Field(default="")  # base64-encoded token (for server deployments)
     gdrive_scopes: str = Field(default="https://www.googleapis.com/auth/drive.readonly")
     gdrive_root_folder_id: str = Field(default="")
 

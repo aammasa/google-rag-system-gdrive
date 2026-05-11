@@ -60,25 +60,42 @@ class DriveClient:
 
     def _build_service(self) -> Any:
         creds: Credentials | None = None
-        token_path = Path(settings.gdrive_token_file)
         scopes = settings.gdrive_scopes_list
 
-        if token_path.exists():
-            creds = Credentials.from_authorized_user_file(str(token_path), scopes)
+        # Priority 1: token from env var (server deployments — no browser available)
+        if settings.gdrive_token_json:
+            raw = base64.b64decode(settings.gdrive_token_json).decode()
+            creds = Credentials.from_authorized_user_info(json.loads(raw), scopes)
+            logger.info("drive_token_from_env")
+
+        # Priority 2: token from file (local dev)
+        if not creds:
+            token_path = Path(settings.gdrive_token_file)
+            if token_path.exists():
+                creds = Credentials.from_authorized_user_file(str(token_path), scopes)
+                logger.info("drive_token_from_file")
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 logger.info("drive_token_refresh")
                 creds.refresh(Request())
+                # Persist refreshed token back to file if possible
+                token_path = Path(settings.gdrive_token_file)
+                try:
+                    token_path.parent.mkdir(parents=True, exist_ok=True)
+                    token_path.write_text(creds.to_json())
+                except OSError:
+                    pass  # read-only filesystem on cloud — token lives in memory
             else:
+                # No valid token — requires interactive OAuth (local dev only)
                 creds_path = self._resolve_credentials_file()
                 logger.info("drive_oauth_flow_starting")
                 flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), scopes)
                 creds = flow.run_local_server(port=0)
-
-            token_path.parent.mkdir(parents=True, exist_ok=True)
-            token_path.write_text(creds.to_json())
-            logger.info("drive_token_saved", path=str(token_path))
+                token_path = Path(settings.gdrive_token_file)
+                token_path.parent.mkdir(parents=True, exist_ok=True)
+                token_path.write_text(creds.to_json())
+                logger.info("drive_token_saved", path=str(token_path))
 
         return build("drive", "v3", credentials=creds)
 
