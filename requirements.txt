@@ -24,6 +24,7 @@ langchain-community==0.4.1
 langchain-text-splitters==1.1.2
 langchain-google-vertexai==3.2.3
 langchain-google-genai==4.2.2
+google-genai==1.75.0
 langchain-chroma==1.1.0
 langsmith==0.8.3
 
