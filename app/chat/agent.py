@@ -172,8 +172,16 @@ class RagAgent:
         )
 
         messages = [SystemMessage(content=RAG_SYSTEM_PROMPT), *prior_messages, final_human]
-        response = await self.llm.ainvoke(messages)
-        return response.content  # type: ignore[return-value]
+        try:
+            response = await self.llm.ainvoke(messages)
+            return response.content  # type: ignore[return-value]
+        except Exception as exc:
+            logger.error(
+                "llm_generate_failed",
+                error_type=type(exc).__name__,
+                error=str(exc)[:500],
+            )
+            raise
 
     # ── Google Chat webhook dispatcher ────────────────────────────────────────
 
